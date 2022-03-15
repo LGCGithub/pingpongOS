@@ -46,10 +46,8 @@ int queue_append (queue_t **queue, queue_t *elem){
 		(*queue)->prev = (*queue);
 	} else {
 		//printf("Outro elemento\n");
-		// Isso não faz o menor sentido, mas funciona, então não vou questionar
-		// Quem fez a interface da fila não sabe como uma fila funciona
-		// Pessoa nova vai para o começo da fila. What?
-		// Ponteiro da fila aponta para o final, achei que apontasse para o inicio.
+		// Pessoa nova vai para o começo da fila. Isso deveria ter sido especificado.
+		// Ponteiro da fila aponta para o final, achei que apontasse para o inicio. Perdi um bom tempo aqui.
 		queue_t* fim = (*queue)->prev;
 		fim->next = elem;
 		queue_t* novo = fim->next;
