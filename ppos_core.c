@@ -4,12 +4,46 @@
 #include <stdlib.h>
 
 task_t* Main, *Atual;
+task_t Dispatcher;
+queue_t* Fila;
 static int id_global = -1;
+static int userTasks = -1;
 
 int new_id(){
     //printf("new id\n");
     id_global++;
     return id_global;
+}
+
+// retorna a proxima tarefa a ser executada
+task_t* scheduler(){
+    task_t* prev = (task_t*)(Fila);
+    Fila = (queue_t*)(Fila->next);
+    return prev;
+}
+
+// controla a ordem de execução das tarefas
+void dispatcher(void *arg){
+    while(userTasks > 0){
+        task_t* next = scheduler();
+        if(next != NULL){
+            task_switch(next);
+            if(next->status == FINALIZADA){
+                // Tira item da fila, libera stack, libera struct
+                queue_remove ((queue_t**)&Fila, (queue_t*) next); 
+                free(next->context.uc_stack.ss_sp);
+                free(next);
+                userTasks--;
+            }
+            // voltando ao dispatcher, trata a tarefa de acordo com seu estado
+            //caso o estado da tarefa "próxima" seja:
+            // PRONTA    : ...
+            // TERMINADA : ...
+            // SUSPENSA  : ...
+            // (etc)
+        }
+    }
+    task_exit(0);
 }
 
 // Inicializa o sistema operacional; deve ser chamada no inicio do main()
@@ -22,6 +56,9 @@ void ppos_init (){
     Main->id = new_id();
     getcontext(&(Main->context));
     Atual = Main;
+
+    Fila = NULL;
+    task_create(&Dispatcher, dispatcher, NULL);
 }
 
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro.
@@ -48,11 +85,19 @@ int task_create (task_t *task,			// descritor da nova tarefa
         }
 
         makecontext (&(new_task->context), (void*)start_func, 1, (void*)arg);
-        
         new_task->id = new_id();
+        
+        new_task->next = NULL;
+        new_task->prev = NULL;
+
+        new_task->status = PRONTA;
 
         *task = *new_task;
 
+        userTasks++;
+        if(task->id > 0){
+            queue_append((queue_t**)&Fila, (queue_t*)new_task);
+        }
         return task->id;
     }
 
@@ -69,7 +114,10 @@ int task_switch (task_t *task){
 void task_exit (int exit_code){
     //printf("task_exit\n");
     //Liberar tarefa atual só depois
-    task_switch(Main);
+    Atual->status = FINALIZADA;
+    // Alternativamente, if(Atual == &Dispatcher) task_switch(Main);
+    if(userTasks > 0) task_switch(&Dispatcher);
+    else task_switch(Main);
 }
 
 // retorna o identificador da tarefa corrente (main deve ser 0)
@@ -77,3 +125,10 @@ int task_id (){
     //printf("task_id\n");
     return Atual->id;
 }
+
+// libera o processador para a próxima tarefa, retornando à fila de tarefas
+// prontas ("ready queue")
+void task_yield (){
+    task_switch(&Dispatcher);
+}
+

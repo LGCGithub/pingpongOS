@@ -11,6 +11,11 @@
 
 #define STACKSIZE 64*1024	/* tamanho de pilha das threads */
 
+#define PRONTA 0
+#define SUSPENSA 1
+#define RODANDO 2
+#define FINALIZADA 3
+
 // Estrutura que define um Task Control Block (TCB)
 typedef struct task_t
 {
